@@ -15,7 +15,7 @@
     <input type="text" id="thumbnailImageURI" name="thumbnailImageURI" value="<%= data.thumbnailImageURI %>" placeholder="Post Thumbnail Image URL">
     
     <label for="body"><b>Content</b></label>
-    <textarea name="body" required cols="50" rows="10"><%= data.body %></textarea>
+    <textarea name="markdownbody" id="markdownbody" required cols="50" rows="10" required><%= data.markdownbody %></textarea>
     
     <label for="desc">Short Description:</label>
     <textarea id="desc" name="desc" required placeholder="Enter Short Description under 10-50 words"><%= data.desc %></textarea>

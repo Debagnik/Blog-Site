@@ -6,9 +6,9 @@ const postSchema = new schema({
         type: String,
         require: true
     },
-    body: {
+    markdownbody: {
         type: String,
-        require: true
+        required: true
     },
     createdAt: {
         type: Date,
@@ -36,7 +36,12 @@ const postSchema = new schema({
     lastUpdateAuthor: {
         type: String,
         required: true
+    },
+    body: {
+        type: String,
+        required: true
     }
+
 });
 
 postSchema.index({
