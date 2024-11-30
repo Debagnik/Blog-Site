@@ -6,9 +6,9 @@ const postSchema = new schema({
         type: String,
         require: true
     },
-    body: {
+    markdownbody: {
         type: String,
-        require: true
+        required: true
     },
     createdAt: {
         type: Date,
@@ -36,14 +36,26 @@ const postSchema = new schema({
     lastUpdateAuthor: {
         type: String,
         required: true
+    },
+    body: {
+        type: String,
+        required: true
+    },
+    isApproved:{
+        type: Boolean,
+        default: false,
+        required: true
     }
+
 });
 
 postSchema.index({
     title: 'text',
     body: 'text',
     tags: 'text',
-    author: 'text'
+    author: 'text',
+    isApproved: 1,
+    createdAt: -1
   });
 
 module.exports = mongoose.model('Posts', postSchema);

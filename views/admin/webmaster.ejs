@@ -34,6 +34,10 @@
         <label for="defaultPaginationLimit">Default Pagination Limit</label>
         <input type="number" id="defaultPaginationLimit" name="defaultPaginationLimit"
             value="<%= config.defaultPaginationLimit %>" required min="1" max="10">
+
+        <label for="searchLimit">Search Result Limit</label>
+        <input type="number" id="searchLimit" name="searchLimit"
+            value="<%= config.searchLimit %>" required min="1" max="50">
         <br><br>
 
         <label for="isRegistrationEnabled">Registration Enabled:</label>

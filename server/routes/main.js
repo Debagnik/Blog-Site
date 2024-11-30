@@ -1,9 +1,12 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 const post = require('../models/posts');
 const siteConfig = require('../models/config');
 const user = require('../models/user');
 
+const jwtSecretKey = process.env.JWT_SECRET;
+const { PRIVILEGE_LEVELS_ENUM, isWebMaster } = require('../../utils/validations');
 /**
  * Site config Middleware
  */
@@ -31,6 +34,12 @@ const fetchSiteConfig = async (req, res, next) => {
 
 router.use(fetchSiteConfig);
 
+if (!jwtSecretKey) {
+    console.error('JWT_SECRET is not defined. Please set it in your environment variables.');
+    // You might want to exit the process gracefully
+    process.exit(1);
+}
+
 //Routes
 /**
  * GET /
@@ -48,19 +57,21 @@ router.get('', async (req, res) => {
         let perPage = res.locals.siteConfig.defaultPaginationLimit || 1;
         let page = req.query.page || 1;
 
-        const data = await post.aggregate([{ $sort: { createdAt: -1 } }]).skip(perPage * page - perPage)
-            .limit(perPage).exec();
+        const data = await post.aggregate([
+            { $match: { isApproved: true } },
+            { $sort: { createdAt: -1 } }
+        ]).skip(perPage * page - perPage).limit(perPage).exec();
 
-        const count = await post.countDocuments({});
+        const count = await post.countDocuments({ isApproved: true });
         const nextPage = parseInt(page) + 1;
         const hasNextPage = nextPage <= Math.ceil(count / perPage);
 
 
-        res.render('index', { 
+        res.render('index', {
             locals,
             data,
             current: page,
-            nextPage: hasNextPage ? nextPage : null 
+            nextPage: hasNextPage ? nextPage : null
         });
         console.log(`DB Posts Data fetched`);
     } catch (error) {
@@ -74,13 +85,13 @@ router.get('', async (req, res) => {
  */
 router.get('/about', (req, res) => {
     const locals = {
-        title: "About Us Section",
+        title: 'About Us Section' + ' - ' + (res.locals.siteConfig.siteName || 'Project Walnut'),
         description: "A blogging site created with Node, express and MongoDB",
         config: res.locals.siteConfig
     }
-    res.render('about', { 
+    res.render('about', {
         locals
-     });
+    });
 });
 
 /**
@@ -89,13 +100,13 @@ router.get('/about', (req, res) => {
  */
 router.get('/contact', (req, res) => {
     const locals = {
-        title: "Contacts us",
+        title: "Contacts us" + ' - ' + (res.locals.siteConfig.siteName || 'Project Walnut'),
         description: "A blogging site created with Node, express and MongoDB",
         config: res.locals.siteConfig
     }
-    res.render('contact', { 
+    res.render('contact', {
         locals
-     });
+    });
 });
 
 /**
@@ -104,6 +115,21 @@ router.get('/contact', (req, res) => {
  */
 router.get('/post/:id', async (req, res) => {
     try {
+        let currentUser = null;
+        const token = req.cookies.token;
+        let userId = null;
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, jwtSecretKey);
+                userId = decoded.userId;
+            } catch (err) {
+                console.error('Invalid token:', err.message);
+            }
+        }
+        if (userId) {
+            currentUser = await user.findById(userId);
+        }
+
         let slug = req.params.id;
         const data = await post.findById({ _id: slug });
         if (!data) {
@@ -115,24 +141,30 @@ router.get('/post/:id', async (req, res) => {
             keywords: data.tags,
             config: res.locals.siteConfig
         }
-        const postAuthor = await user.findOne({ username: data.author});
+        const postAuthor = await user.findOne({ username: data.author });
         if (!postAuthor) {
             data.author = 'Anonymous'
         } else {
             data.author = postAuthor.name;
         }
-        res.render('posts', { 
-            locals,
-            data
-        });
+        
+        if(currentUser || data.isApproved) {
+            res.render('posts', {
+                locals,
+                data
+            });
+        } else {
+            res.redirect('/404');
+        }
+
     } catch (error) {
         console.error('Post Fetch error', error);
         res.status(404).render('404', {
             locals: {
                 title: "404 - Page Not Found",
-                description: "The page you're looking for doesn't exist."
-            },
-            config: res.locals.siteConfig
+                description: "The page you're looking for doesn't exist.",
+                config: res.locals.siteConfig
+            }
         });
     }
 });
@@ -144,7 +176,7 @@ router.get('/post/:id', async (req, res) => {
 router.post('/search', async (req, res) => {
     try {
 
-        let searchLimit = 20;
+        let searchLimit = res.locals.siteConfig.searchLimit;
         let searchTerm = req.body.searchTerm;
         searchTerm = searchTerm.trim().replace(/[<>]/g, '');
         if (!searchTerm || typeof searchTerm !== 'string') {
@@ -153,7 +185,7 @@ router.post('/search', async (req, res) => {
         if (searchTerm.trim().length == 0) {
             return res.status(400).json({ error: 'Search term cannot be empty' });
         }
-        if (searchTerm.trim().length > 100) { 
+        if (searchTerm.trim().length > 100) {
             return res.status(400).json({ error: 'Search term is too long' });
         }
         const searchNoSpecialChar = searchTerm.replace(/[^a-zA-Z0-9 ]/g, "");
@@ -166,7 +198,12 @@ router.post('/search', async (req, res) => {
         }
 
         const data = await post.find(
-            { $text: { $search: searchNoSpecialChar } },
+            {
+                $and: [
+                    { $text: { $search: searchNoSpecialChar } },
+                    { isApproved: true }
+                ]
+            },
             { score: { $meta: 'textScore' } }
         )
             .sort({ score: { $meta: 'textScore' } })

@@ -1,27 +1,31 @@
-# Blog Site
+# Project Walnut
 
-Welcome to the **Blog Site** project. It is a simple webapp for small-startups to post their blogs, or news outlets for publishing news article 
+![Walnut_Lycoris-Recoil](https://github.com/user-attachments/assets/e387eeb7-0bff-48b1-a277-264d28ccf0a9)   
+[Walnut the mascot](https://lycoris-recoil.fandom.com/wiki/Kurumi)
+
+Welcome to the **Project Walnut** project. It is a simple webapp for small-startups to post their blogs, or news outlets for publishing news article 
 
 ## Features
 
 - **User Authentication**
-  - Sign up and login functionality using secure authentication.
-  - Admins can disable or enable registration from environment variable (Future plans has to move this feature to DB)
+  - Sign up and login functionality using secure authentication. For editors, moderators and site admins(web master)
+  - Admins can disable or enable registration from site configurations
 - **CRUD Operations**
   - Create, read, update, and delete blog posts.
   - proper access privilege for admin dashboard access
-  - Markdown support in editor (Coming soon)
+  - Webmaster portal for maintaining site settings and global site config
+  - Markdown support in editors
 - **Comments Section**
   - Users can comment on posts using disqus integration. (In progress)
-  - Comments will be saved to DB with DDoS protection (Planned)
+  - Comments will be saved to DB with DDoS protection (In progress)
 - **Responsive Design**
   - Accessible on both desktop and mobile devices.
-  - A better UI development is in progress
+  - Accessible Dark/light UI for better reading experience
 
 ## Technologies Used
 
 - **Frontend**
-  - HTML5, CSS3, JavaScript
+  - HTML5, CSS3, JavaScript, EJS
 - **Backend**
   - Node.js, Express.js
   - Database: MongoDB with Mongoose ODM
@@ -30,11 +34,11 @@ Welcome to the **Blog Site** project. It is a simple webapp for small-startups t
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/Debagnik/Blog-Site.git
+   git clone https://github.com/Debagnik/project-walnut.git
    ```
 2. **Navigate to the project directory:**
    ```bash
-   cd Blog-Site
+   cd project-walnut
    ```
 3. **Install dependencies:**
    ```bash
@@ -44,9 +48,7 @@ Welcome to the **Blog Site** project. It is a simple webapp for small-startups t
    - Create a `.env` file and add your MongoDB URI and any other required configurations as below.
      ```text
      MONGO_DB_URI=mongodb://username:password@host/blog #Required
-     PORT=80 #Optonal, defaults to 5000
-     ENABLE_REGISTRATION=true #defaults to false
-     SEARCH_PAGANATION_LIMIT=10 #defaults to 10
+     PORT= #Optonal, defaults to 5000
      JWT_SECRET=your-default-jwt-secrets #Required
      SESSION_SECRET=your-secure-session-secret #Required
      NODE_ENV=dev-local #Defaults to dev-local use production in production scenario

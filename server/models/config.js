@@ -76,6 +76,13 @@ const configSchema = new schema({
     copyrightText:{
         type: String,
         default: 'Project Walnut. All rights reserved.'
+    },
+    searchLimit:{
+        type: Number,
+        default: 10,
+        required: true,
+        min: [1, 'At least show one item per page, stupid!'],
+        max: [50, 'No more than 50 items per page, silly!']
     }
 });
 

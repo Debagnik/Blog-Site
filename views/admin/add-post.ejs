@@ -11,8 +11,8 @@
     <label for="thumbnailImageURI">Thumbnail Image link</label>
     <input type="text" id="thumbnailImageURI" name="thumbnailImageURI" placeholder="Add Thumbnail link" onchange="previewImage(this.value)" pattern="https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)">
 
-    <label for="body">Body:</label>
-    <textarea id="body" name="body" cols="10" rows="10" required placeholder="Enter Body"></textarea>
+    <label for="body">Body (type and format in Markdown):</label>
+    <textarea id="markdownbody" name="markdownbody" cols="10" rows="10" required placeholder="Enter Body"></textarea>
 
     <label for="desc">Short Description:</label>
     <textarea id="desc" name="desc" placeholder="Enter Short Description under 10-50 words" required></textarea>

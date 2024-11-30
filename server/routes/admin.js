@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const csrf = require('csurf');
 const sanitizeHtml = require('sanitize-html');
+const marked = require('marked');
 
 const router = express.Router();
 const post = require('../models/posts');
@@ -70,6 +71,32 @@ const fetchSiteConfig = async (req, res, next) => {
 }
 
 router.use(fetchSiteConfig);
+
+/**
+ * Post add/edit markdown function
+ */
+function markdownToHtml(markdownString) {
+  try {
+    // convert markdown string to HTML string
+    let htmlString = marked.parse(markdownString);
+
+    // sanitize HTML string to prevent XSS attacks
+    htmlString = sanitizeHtml(htmlString, {
+      allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img']),
+      allowedAttributes: {
+        ...sanitizeHtml.defaults.allowedAttributes,
+        img: ['src', 'alt', 'title']
+      }
+    });
+    return htmlString.replace(/<(\/?)h([1-3])>/g, (match, p1, p2) => {
+      const newLevel = parseInt(p2) + 1;
+      return `<${p1}h${newLevel}>`;
+    });
+  } catch (error) {
+    console.error("Markdown to HTML conversion error", error.message);
+    throw new Error('Failed to process markdown content');
+  }
+}
 
 
 //Routes
@@ -153,7 +180,7 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    if(!isStrongPassword(password)) {
+    if (!isStrongPassword(password)) {
       return res.render('admin/index', {
         errors: [{ msg: 'Password is too weak. It should be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one special character.' }],
         errors_login: [],
@@ -383,13 +410,23 @@ router.post('/admin/add-post', authToken, async (req, res) => {
 
     const defaultThumbnailImageURI = isValidURI(req.body.thumbnailImageURI) ? req.body.thumbnailImageURI : siteConfigDefaultThumbnail
 
-    if (!req.body.title?.trim() || !req.body.body?.trim() || !req.body.desc?.trim()) {
+    if (!req.body.title?.trim() || !req.body.markdownbody?.trim() || !req.body.desc?.trim()) {
       return res.status(400).send('Title, body, and description are required!');
     }
+    const MAX_TITLE_LENGTH = 50;
+    const MAX_DESCRIPTION_LENGTH = 500;
+    const MAX_BODY_LENGTH = 100000;
+
+    if (req.body.title.length > MAX_TITLE_LENGTH || req.body.markdownbody.length > MAX_BODY_LENGTH || req.body.desc.length > MAX_DESCRIPTION_LENGTH) {
+      return res.status(400).send('Title, body, and description must not exceed their respective limits!');
+    }
+
+    const htmlBody = markdownToHtml(req.body.markdownbody.trim());
 
     const newPost = new post({
       title: req.body.title.trim(),
-      body: req.body.body.trim(),
+      markdownbody: req.body.markdownbody.trim(),
+      body: htmlBody,
       author: currentUser.username.trim(),
       tags: req.body.tags.trim(),
       desc: req.body.desc.trim(),
@@ -432,7 +469,8 @@ router.get('/edit-post/:id', authToken, async (req, res) => {
       data,
       layout: adminLayout,
       csrfToken: req.csrfToken(),
-      isWebMaster: isWebMaster(currentUser)
+      isWebMaster: isWebMaster(currentUser),
+      currentUser: { privilege: currentUser.privilege }
     })
 
   } catch (error) {
@@ -464,20 +502,36 @@ router.put('/edit-post/:id', authToken, async (req, res) => {
 
     const defaultThumbnailImageURI = isValidURI(req.body.thumbnailImageURI) ? req.body.thumbnailImageURI : siteConfigDefaultThumbnail;
 
-    if (!req.body.title?.trim() || !req.body.body?.trim() || !req.body.desc?.trim()) {
+    if (!req.body.title?.trim() || !req.body.markdownbody?.trim() || !req.body.desc?.trim()) {
       return res.status(400).send('Title, body, and description are required!');
     }
 
+    const MAX_TITLE_LENGTH = 50;
+    const MAX_DESCRIPTION_LENGTH = 500;
+    const MAX_BODY_LENGTH = 100000;
 
-    await post.findByIdAndUpdate(req.params.id, {
+    if (req.body.title.length > MAX_TITLE_LENGTH || req.body.markdownbody.length > MAX_BODY_LENGTH || req.body.desc.length > MAX_DESCRIPTION_LENGTH) {
+      return res.status(400).send('Title, body, and description must not exceed their respective limits!');
+    }
+
+    const htmlBody = markdownToHtml(req.body.markdownbody.trim());
+
+    const updatePostData = {
       title: req.body.title.trim(),
-      body: req.body.body.trim(),
+      body: htmlBody,
+      markdownbody: req.body.markdownbody.trim(),
       desc: req.body.desc.trim(),
       tags: req.body.tags.trim(),
       thumbnailImageURI: defaultThumbnailImageURI,
       modifiedAt: Date.now(),
       lastUpdateAuthor: currentUser.username
-    });
+    }
+
+    if (currentUser.privilege === PRIVILEGE_LEVELS_ENUM.MODERATOR || currentUser.privilege === PRIVILEGE_LEVELS_ENUM.WEBMASTER) {
+      updatePostData.isApproved = req.body.isApproved === 'on'
+    } 
+
+    await post.findByIdAndUpdate(req.params.id, updatePostData);
 
     const updatedPost = await post.findById(req.params.id);
     if (!updatedPost) {
@@ -613,6 +667,11 @@ router.post('/edit-site-config', authToken, async (req, res) => {
         return res.status(400).send('Invalid pagination limit');
       }
 
+      const searchLimit = parseInt(req.body.searchLimit);
+      if (Number.isNaN(searchLimit) || searchLimit < 1 || searchLimit > 50) {
+        return res.status(400).send('Invalid search limit');
+      }
+
 
       let validUrl = globalSiteConfig.siteDefaultThumbnailUri;
       if (req.body.siteDefaultThumbnailUri) {
@@ -643,7 +702,7 @@ router.post('/edit-site-config', authToken, async (req, res) => {
         homeWelcomeSubText: req.body.homeWelcomeSubText,
         homepageWelcomeImage: validHomePageImageUri,
         copyrightText: req.body.copyrightText,
-
+        searchLimit: searchLimit
       });
 
       if (!globalSiteConfig) {
@@ -683,9 +742,9 @@ router.delete('/delete-user/:id', authToken, async (req, res) => {
 
     //prevent self deletion
     if (currentUser._id.toString() === userToDelete._id.toString()) {
-      return res.status(405).json({ 
-        error: 'Invalid Operation', 
-        message: 'Self-deletion is not allowed for security reasons' 
+      return res.status(405).json({
+        error: 'Invalid Operation',
+        message: 'Self-deletion is not allowed for security reasons'
       });
     }
 
